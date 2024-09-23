@@ -24,8 +24,8 @@ export class EmailService {
             template,
             context: {
                 name,
-                activationCode
-            }
+                activationCode,
+            },
         })
     }
 }

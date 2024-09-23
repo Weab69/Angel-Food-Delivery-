@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { RegisterDto, LoginDto } from './dto/user.dto';
+import { JwtService, JwtVerifyOptions } from '@nestjs/jwt';
+import { RegisterDto, LoginDto, ActivationDto } from './dto/user.dto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/Prisma.Service';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from './email/email.service';
+import { User } from './entities/user.entity';
 
 interface UserData{
   name: string;
@@ -56,12 +57,12 @@ export class UsersService {
     await this.emailService.sendMail({
       email,
       subject: 'Activate your account',
-      template: '../../../email-templates/activation-mail.ejs',
+      template: './activation-mail',
       name,
       activationCode,
     })
     
-    return {user, response }
+    return {user, response, activation_token: activationToken.token}
   }
   // create activation token
   async createActivationToken(user: UserData) {
@@ -79,7 +80,40 @@ export class UsersService {
     );
     return {token, activationCode};
   }
+  //activation user
+  async activateUser(activationDto: ActivationDto, response: Response) {
+    const {activationToken, activationCode} = activationDto;
 
+    const newUser: {User: UserData, activationCode: string} = this.jwtService.verify(activationToken,{
+        secret: this.configService.get<string>('ACTIVATION_SECRET'),
+    } as JwtVerifyOptions);
+
+    if(newUser.activationCode !== activationCode){
+      throw new BadRequestException('Invalid activation code')
+    }
+    const {name, email, password, phone_number} = newUser.User
+
+    const existUser = await this.prisma.user.findFirst({
+      where:{
+        email,
+      }
+    });
+
+    if(existUser){
+      throw new BadRequestException('User already exists')
+    }
+    const user = await this.prisma.user.create({
+      data:{
+        name,
+        email,
+        password,
+        phone_number,
+        role: 'User',
+      }
+    })
+    return {user,activationToken, response}
+
+  }
 
   //Login user
   async login(loginDto: LoginDto){
