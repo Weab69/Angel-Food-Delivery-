@@ -18,7 +18,7 @@ import { EmailService } from './email/email.service';
         federation: 2,
       },
     }),
-    EmailModule
+    EmailModule,
   ],
   controllers: [],
   providers: [UsersService, ConfigService, JwtService, PrismaService, UsersResolver, EmailService],

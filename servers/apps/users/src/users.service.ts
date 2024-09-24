@@ -8,6 +8,7 @@ import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from './email/email.service';
 import { User } from './entities/user.entity';
+import { TokenSender } from './utils/sendTokens';
 
 interface UserData{
   name: string;
@@ -52,6 +53,7 @@ export class UsersService {
         role: 'User',
         phone_number,
     }
+    // send mail
     const activationToken = await this.createActivationToken(user)
     const activationCode = activationToken.activationCode;
     await this.emailService.sendMail({
@@ -64,6 +66,8 @@ export class UsersService {
     
     return {user, response, activation_token: activationToken.token}
   }
+  
+  
   // create activation token
   async createActivationToken(user: UserData) {
     const activationCode = Math.floor(1000+Math.random()*9000).toString();
@@ -84,21 +88,21 @@ export class UsersService {
   async activateUser(activationDto: ActivationDto, response: Response) {
     const {activationToken, activationCode} = activationDto;
 
-    const newUser: {User: UserData, activationCode: string} = this.jwtService.verify(activationToken,{
+    const newUser: {user: UserData, activationCode: string} = this.jwtService.verify(activationToken,{
         secret: this.configService.get<string>('ACTIVATION_SECRET'),
-    } as JwtVerifyOptions);
+    } as JwtVerifyOptions) as {user: UserData, activationCode: string};
 
     if(newUser.activationCode !== activationCode){
       throw new BadRequestException('Invalid activation code')
     }
-    const {name, email, password, phone_number} = newUser.User
+    const {name, email, password, phone_number} = newUser.user
 
     const existUser = await this.prisma.user.findFirst({
       where:{
         email,
       }
     });
-
+  
     if(existUser){
       throw new BadRequestException('User already exists')
     }
@@ -118,12 +122,47 @@ export class UsersService {
   //Login user
   async login(loginDto: LoginDto){
     const {email, password} = loginDto
-    const user = {
-      email,
-      password,
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email,
+      }
+    })
+    if(user && (await this.comparePassword(password, user.password))){
+      const tokensender = new TokenSender(this.configService, this.jwtService)
+      return tokensender.sendToken(user)
+    }else{
+      return {
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        error: {
+          message: 'Invalid email or password'
+        },
+      };
     }
-    return user
+
   }
+// compare password with hashed password
+async comparePassword(password: string, hashedPassword: string): Promise<boolean>
+ {
+  return await bcrypt.compare(password, hashedPassword);
+}
+
+//get logged in user
+async getLoggedInUser(req: any){
+  const user = req.user
+  const accessToken = req.accessToken
+  const refreshToken = req.refreshToken
+  return {user, accessToken, refreshToken}
+}
+// Log out 
+async Logout(req: any){
+  req.user = null;
+  req.accessToken = null;
+  req.refreshToken = null;
+  return { message: 'Logged out successfully' };
+}
+
 //get all users
 async getUsers(){
   

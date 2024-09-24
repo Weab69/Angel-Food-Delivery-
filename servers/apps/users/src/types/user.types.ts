@@ -31,10 +31,23 @@ export class ActivationResponse{
 @ObjectType()
 export class LoginResponse{
     @Field(()=> User)
-    user?: User;
+    user?: User | any;
+
+    @Field()
+    accessToken?: string;
+
+    @Field()
+    refreshToken?: string;
 
     @Field(()=> ErrorType, {nullable: true})
     error?: ErrorType;
     
 }
+
+@ObjectType()
+export class LogoutResponse{
+    @Field()
+    message?: string;
+}
+
 

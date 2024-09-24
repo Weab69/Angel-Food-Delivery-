@@ -19,10 +19,10 @@ import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
           },
         },
         defaults: {
-          from: 'yeabyg',
+          from: 'Angel Delivery',
         },
         template: {
-          dir: join(__dirname, '../../../../email-templates'),
+          dir: join(__dirname, '..', '..', '..', '..', 'servers', 'email-templates'),
           adapter: new EjsAdapter(),
           options: {
             strict: false,
